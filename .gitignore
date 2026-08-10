@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv/
+
+# 运行时数据(不提交)
+# 注意:gitignore 不支持行尾注释,以下规则切勿加行尾说明,否则整行失效
+logs/
+volumes/
+uploads/
+.env
+
+# 临时测试产物
+test_ocr.png
+quick_test.py
+ocr_test.py
+*.tmp
+
+# 工具产物(不提交)
+.omo/
+.playwright-mcp/
+.codegraph/
+
+# IDE
+.idea/
+.vscode/

@@ -1,0 +1,22 @@
+# gitleaks 配置 —— 扫描仓库中的硬编码密钥
+# 用法: gitleaks detect --source . --config .gitleaks.toml
+# 建议接入 CI(见 .github/workflows/ci.yml)
+
+title = "my-aiops-agent gitleaks config"
+
+[extend]
+useDefault = true
+
+# 排除:运行时数据、虚拟环境、锁文件(uv.lock 含哈希但非密钥)
+[allowlist]
+description = "非源码目录与已知测试产物"
+paths = [
+  '''\.venv/''',
+  '''volumes/''',
+  '''\.git/''',
+  '''node_modules/''',
+  '''uv\.lock''',
+  '''\.pytest_cache/''',
+  '''__pycache__/''',
+  '''\.idea/''',
+]

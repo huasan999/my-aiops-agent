@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AIOps Agent</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+<div class="app">
+    <!-- 左侧边栏 -->
+    <aside class="sidebar">
+        <button class="new-chat-btn" onclick="newChat()">＋ 新建对话</button>
+        <div class="session-list" id="sessionList"></div>        <!-- 文档上传 -->
+        <div class="upload-area">
+            <input type="file" id="fileInput" accept=".txt,.md,.pdf,.docx,.png,.jpg,.jpeg,.bmp,.webp" hidden>
+            <button class="upload-btn" id="uploadBtn">📤 上传文档到知识库</button>
+            <div class="upload-formats">支持:txt · md · pdf · docx · 图片(OCR)</div>
+            <div class="upload-status" id="uploadStatus"></div>
+            <button class="upload-btn memory-clear-btn" id="memoryClearBtn" style="margin-top:6px;">🧠 清除长期记忆</button>
+        </div>
+        <div class="sidebar-footer">AIOps Agent v1.0</div>
+    </aside>
+
+    <!-- 主区域 -->
+    <main class="main">
+        <div class="chat-header">
+            <span>AIOps 智能助手</span>
+            <div class="header-actions">
+                <button class="header-btn" id="aiopsBtn" title="智能运维诊断">🔧 诊断</button>
+                <button class="theme-btn" id="themeBtn" title="切换白天/黑夜">☀️</button>
+            </div>
+        </div>
+
+        <!-- 消息区 -->
+        <div class="messages" id="messages"></div>
+
+        <!-- 输入区 -->
+        <div class="input-area">
+            <div class="input-wrapper">
+                <div class="image-preview" id="imagePreview" hidden>
+                    <img id="previewImg" alt="预览">
+                    <button class="remove-image" id="removeImageBtn">×</button>
+                </div>
+                <div class="input-row">
+                    <input type="file" id="imageInput" accept="image/*" hidden>
+                    <button class="attach-btn" id="attachBtn" title="上传图片给 Agent 看">🖼️ 图片</button>
+                    <textarea id="input" rows="1"
+                        placeholder="给 AIOps Agent 发送消息（Enter 发送，Shift+Enter 换行）"></textarea>
+                    <button class="send-btn" id="sendBtn">发送</button>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+<script src="/static/app.js"></script>
+</body>
+</html>

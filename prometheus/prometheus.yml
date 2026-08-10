@@ -1,0 +1,12 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  - /etc/prometheus/rules.yml
+
+scrape_configs:
+  # 故意指向不存在的端口:让 up=0,触发 FakeServiceDown 告警
+  - job_name: fake-service
+    static_configs:
+      - targets: ['localhost:9999']

@@ -1,0 +1,22 @@
+groups:
+  - name: demo-alerts
+    rules:
+      # 真实会触发的告警:fake-service 抓取失败 → up=0 → firing
+      - alert: FakeServiceDown
+        expr: up{job="fake-service"} == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "FakeService 不可用"
+          description: "FakeService 服务已下线超过 30 秒,请立即检查进程和网络"
+
+      # 预留规则:有真实指标后会自动生效
+      - alert: HighCPUUsage
+        expr: cpu_usage_percent > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "CPU 使用率过高"
+          description: "CPU 使用率持续 5 分钟超过 80%"

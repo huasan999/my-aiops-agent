@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  secrets-scan:
+    name: Secret 扫描 (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}   # 可选:企业版;开源版无 LICENSE 也工作
+
+  lint-and-smoke:
+    name: 语法检查 + 冒烟测试
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: 安装依赖
+        run: uv sync
+      - name: 语法编译检查(全部源码)
+        run: |
+          uv run python -m compileall app llm_gateway.py
+      - name: 冒烟:状态机保险丝(无需外部服务)
+        run: |
+          uv run python scripts/test_state.py
+      - name: 冒烟:executor 节点(无需 LLM)
+        run: |
+          uv run python scripts/test_executor.py
+      - name: 冒烟:诊断任务管理器(异步/订阅)
+        run: |
+          uv run python scripts/test_diagnosis_manager.py
+      - name: 冒烟:诊断 API(202 提交 + 状态查询)
+        run: |
+          uv run python scripts/test_aiops_api.py
