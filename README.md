@@ -257,4 +257,6 @@ python scripts\index_docs.py
 
 ## 许可
 
-未定。仓库元数据中暂未声明 LICENSE。
+[MIT](LICENSE) — 允许商用、修改、私有化、再分发,只需保留版权声明。
+
+Copyright (c) 2026 huasan999
