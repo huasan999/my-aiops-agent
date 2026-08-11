@@ -259,6 +259,44 @@ body {
     border-radius: 4px;
     font-size: 13px;
 }
+.message pre code { background: none; padding: 0; }
+
+/* ---------- Markdown 渲染样式 ---------- */
+.message .bubble h1,
+.message .bubble h2,
+.message .bubble h3 {
+    margin: 10px 0 4px;
+    font-weight: 700;
+    line-height: 1.4;
+}
+.message .bubble h1 { font-size: 17px; }
+.message .bubble h2 { font-size: 15px; }
+.message .bubble h3 { font-size: 14px; }
+.message .bubble p { margin: 6px 0; line-height: 1.6; }
+.message .bubble ul,
+.message .bubble ol { margin: 6px 0; padding-left: 22px; }
+.message .bubble li { margin: 2px 0; line-height: 1.6; }
+.message .bubble table {
+    border-collapse: collapse;
+    margin: 8px 0;
+    font-size: 13px;
+    width: 100%;
+}
+.message .bubble th,
+.message .bubble td {
+    border: 1px solid var(--border-light);
+    padding: 4px 8px;
+    text-align: left;
+    line-height: 1.5;
+}
+.message .bubble th { background: var(--code-bg); font-weight: 600; }
+.message .bubble blockquote {
+    margin: 6px 0;
+    padding: 4px 10px;
+    border-left: 3px solid var(--border-light);
+    color: var(--text-dim);
+}
+.message .bubble hr { border: none; border-top: 1px solid var(--border-light); margin: 10px 0; }
 
 /* ---------- 输入区 ---------- */
 .input-area {

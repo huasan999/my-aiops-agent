@@ -41,8 +41,9 @@ services:
       MINIO_ACCESS_KEY: minioadmin
       MINIO_SECRET_KEY: minioadmin
     ports:
-      - "9001:9001"
-      - "9000:9000"
+      # 9000/9001 常落在 Windows 动态保留区间(当前 8920-9019),映射到 19xxx
+      - "19001:9001"  # minio console
+      - "19000:9000"  # minio API(容器间通信走内网 minio:9000,不受影响)
     volumes:
       - ${DOCKER_VOLUME_DIRECTORY:-.}/volumes/minio:/minio_data
     command: minio server /minio_data --console-address ":9001"

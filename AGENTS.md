@@ -5,7 +5,7 @@
 **Package:** my-aiops-agent v0.1.0
 
 ## OVERVIEW
-AIOps 智能诊断代理:FastAPI + LangGraph 实现的 Plan-Execute-Replan 状态机,自动排查系统告警(CPU/内存/磁盘/服务不可用/响应慢)并生成诊断报告。Python 3.13,uv 管理,LLM 通过本地网关转发,向量知识库基于 Milvus。企业级特性:Postgres 持久化检查点、异步诊断任务(202+SSE 订阅)、Langfuse 追踪。
+AIOps 智能诊断代理:FastAPI + LangGraph 实现的 Plan-Execute-Replan 状态机,自动排查系统告警(CPU/内存/磁盘/服务不可用/响应慢)并生成诊断报告。Python 3.13,uv 管理,LLM 通过本地网关转发,向量知识库基于 Milvus。企业级特性:Postgres 持久化检查点、异步诊断任务(202+SSE 订阅)、LangSmith 追踪。
 
 ## STRUCTURE
 ```
@@ -20,7 +20,6 @@ my-aiops-agent/
 ├── static/            # 前端页面(原生 HTML/CSS/JS)
 ├── prometheus/        # Prometheus 抓取 + 告警规则
 ├── vector-database.yml # Milvus 栈 + Postgres 检查点 docker-compose
-├── langfuse.yml       # Langfuse 可观测性栈 docker-compose(可选)
 ├── .env.example       # 环境变量模板(复制为 .env)
 ├── .gitleaks.toml     # 密钥扫描配置
 └── volumes/           # 运行数据(etcd/milvus/minio/postgres,勿提交)
@@ -35,7 +34,7 @@ my-aiops-agent/
 | 状态机节点 | `app/agent/aiops/` | planner→executor→replanner 循环 |
 | HTTP 接口 | `app/api/` | POST /api/aiops + GET /api/aiops/{id}/events |
 | LLM 调用 | `app/core/llm_client.py` | 统一经网关 :8006 |
-| 可观测性 | `app/core/tracing.py` | Langfuse 懒初始化 |
+| 可观测性 | `app/core/tracing.py` | LangSmith 自动追踪(环境变量) |
 | 向量检索/索引 | `app/services/vector_*` | Milvus,懒初始化 |
 | 文档入库 | `scripts/index_docs.py` | aiops-docs → Milvus |
 | 告警查询 | `app/tools/query_metrics_alerts.py` | Prometheus |
@@ -56,7 +55,7 @@ my-aiops-agent/
 - **依赖硬钉**:核心库用 `==` 精确锁定(langchain==1.2.10, langgraph==1.0.8, pymilvus==2.6.9),勿浮动
 - **所有 LLM 流量必须经网关** `127.0.0.1:8006/v1`(llm_gateway.py 做供应商转发);唯一例外:多模态走 Ollama 原生 API
 - **懒初始化**:异步/向量资源禁止在模块导入期创建(防事件循环污染);aiops_service 的 graph 惰性编译
-- **配置走环境变量**:`DEEPSEEK_API_KEY`、`LLM_BASE_URL`(默认 :8006/v1)、`PROMETHEUS_BASE_URL`(默认 :9090)、`CHECKPOINTER_DSN`(Postgres,空则内存)、`LANGFUSE_*`;模板在 `.env.example`
+- **配置走环境变量**:`DEEPSEEK_API_KEY`、`LLM_BASE_URL`(默认 :8006/v1)、`PROMETHEUS_BASE_URL`(默认 :9090)、`CHECKPOINTER_DSN`(Postgres,空则内存)、`LANGSMITH_*`;模板在 `.env.example`
 - **Windows 事件循环**:psycopg async 不支持 ProactorEventLoop;必须用 `python -m app.main` 启动(uvicorn CLI 模式会在创建事件循环后才 import main.py,policy 来不及生效);新测试脚本同样需在 asyncio.run 前设置 policy
 - **源码一律 UTF-8**(config.py 已有 mojibake 事故,GBK 读取会损坏注释)
 - **测试无 pytest**:冒烟脚本在 scripts/test_*.py,直接 `python` 运行
@@ -88,8 +87,8 @@ uvicorn app.main:app --host 0.0.0.0 --port 9900
 # 起基础设施(Milvus 栈 + Postgres 检查点)
 docker compose -f vector-database.yml up -d
 
-# 起 Langfuse(可选,可观测性)
-docker compose -f langfuse.yml up -d
+# 起 LangSmith 追踪(可选):在 .env 配置 LANGSMITH_API_KEY 即可(云服务,无需本地容器)
+# 参考 https://smith.langchain.com
 
 # 冒烟测试(无 pytest,逐个跑)
 python scripts/test_diagnosis_manager.py
@@ -108,7 +107,7 @@ curl http://localhost:9900/health
 ```
 
 ## NOTES
-- **端口**:应用 :9900,网关 :8006,MCP :8003,Milvus :19530,Attu :8000,Ollama :11434,Prometheus :9090,Postgres :5432,Langfuse :4000
+- **端口**:应用 :9900,网关 :8006,MCP :8003,Milvus :19530,Attu :8000,Ollama :11434,Prometheus :9090,Postgres :5432,LangSmith(云,无本地端口)
 - **Windows 端口坑**:Milvus 9091 落在系统保留区间(9080-9179),已映射到宿主 19091(vector-database.yml:56)
 - **Prometheus 容器不在 compose 里**:靠 `docker start prometheus` 启动(已手动创建过)
 - **README.md 为空**:运行说明实际上全在 start-windows.bat 里,勿依赖 README

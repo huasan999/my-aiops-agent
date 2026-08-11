@@ -62,14 +62,17 @@ function deleteSession(id) {
 }
 
 // ---------- 消息渲染 ----------
-function addMessage(role, content) {
+function addMessage(role, content, useMarkdown = false) {
     const messages = document.getElementById("messages");
     const div = document.createElement("div");
     div.className = "message " + role;
 
     const bubble = document.createElement("div");
     bubble.className = "bubble";
-    if (content) bubble.textContent = content;
+    if (content) {
+        if (useMarkdown) bubble.innerHTML = renderMarkdown(content);
+        else bubble.textContent = content;
+    }
     div.appendChild(bubble);
     messages.appendChild(div);
     messages.scrollTop = messages.scrollHeight;
@@ -90,7 +93,7 @@ function switchSession(id) {
     const sessions = loadSessions();
     const session = sessions.find(s => s.id === id);
     if (session) {
-        session.messages.forEach(m => addMessage(m.role, m.content));
+        session.messages.forEach(m => addMessage(m.role, m.content, m.role === "assistant"));
     }
     renderSessionList();
 }
@@ -170,7 +173,8 @@ async function sendMessage() {
             return false;
         });
 
-        // 4. 保存会话到 localStorage
+        // 4. 保存会话到 localStorage(流式完成后把最终内容渲染为 Markdown)
+        if (fullAnswer) aiBubble.innerHTML = renderMarkdown(fullAnswer);
         const sessions = loadSessions();
         const existing = sessions.find(s => s.id === currentSessionId);
         if (existing) {
@@ -273,9 +277,9 @@ async function startDiagnosis() {
                 panel.appendChild(item);
                 statusLine.textContent = data.message;
             } else if (data.type === "report") {
-                // 最终报告:单独气泡展示
+                // 最终报告:单独气泡展示(Markdown 渲染)
                 statusLine.textContent = "诊断完成";
-                addMessage("assistant", data.report);
+                addMessage("assistant", data.report, true);
             } else if (data.type === "complete") {
                 return true;   // 结束
             } else if (data.type === "error") {

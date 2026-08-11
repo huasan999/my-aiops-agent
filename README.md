@@ -44,7 +44,7 @@
         └──────────┘    └──────────┘    └──────────┘
 
         Postgres :5432  ── LangGraph 检查点(崩溃恢复 + 历史回放)
-        Langfuse  :4000 ── 全链路 LLM 追踪(可选,生产推荐开)
+        LangSmith(云) ── 全链路 LLM 追踪(可选,生产推荐开)
 ```
 
 **关键设计**:
@@ -66,7 +66,7 @@
 | 向量库 | Milvus 2.6.9 (pymilvus) | 知识库 + 长期记忆 |
 | 检查点 | Postgres + langgraph-checkpoint-postgres | 空 DSN 则退化到内存 |
 | 监控数据 | Prometheus :9090 | 告警 + 指标查询 |
-| 可观测性 | Langfuse 3 | 可选,自托管或云 |
+| 可观测性 | LangSmith | 可选,云服务,环境变量自动追踪 |
 | 前端 | 原生 HTML/CSS/JS | 无构建步骤 |
 | 依赖管理 | uv (pyproject.toml + uv.lock) | 不要用 pip |
 
@@ -81,8 +81,7 @@
 | 9090 | Prometheus | 已有容器,docker start 启动 |
 | 19530 | Milvus | 向量库 |
 | 8000 | Attu | Milvus Web UI |
-| 5432 | Postgres | 检查点 + (可选)Langfuse |
-| 4000 | Langfuse | 可观测性(可选) |
+| 5432 | Postgres | LangGraph 检查点 |
 | 11434 | Ollama | 本地 LLM 备选 |
 | 8003 | MCP Server | 内置 clock_server |
 
@@ -125,8 +124,7 @@ docker compose -f vector-database.yml up -d
 # 已有 Prometheus 容器(未在 compose 里)
 docker start prometheus
 
-# 可选:Langfuse 可观测性
-docker compose -f langfuse.yml up -d
+# 可选:LangSmith 追踪 —— 在 .env 配置 LANGSMITH_API_KEY(云服务,无需本地容器)
 ```
 
 ### 5. 一键启动

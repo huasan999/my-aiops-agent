@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 AIOps 智能诊断代理:FastAPI + LangGraph 实现的 Plan-Execute-Replan 状态机,自动排查系统告警(CPU/内存/磁盘/服务不可用/响应慢)并生成诊断报告。
 
-- **技术栈**:Python 3.13,`uv` 管理依赖,Milvus 向量库,Postgres 检查点持久化,Langfuse 追踪,Prometheus 告警,SSE 实时推送
+- **技术栈**:Python 3.13,`uv` 管理依赖,Milvus 向量库,Postgres 检查点持久化,LangSmith 追踪,Prometheus 告警,SSE 实时推送
 - **入口**:`app/main.py` 挂 5 个路由(`/api` 前缀)+ static 前端,:9900
 - **运行说明都在 `start-windows.bat` 里**(README.md 为空,勿依赖 README)
 
@@ -22,7 +22,7 @@ start-windows.bat
 python llm_gateway.py                                            # LLM 网关 :8006
 uvicorn app.main:app --host 0.0.0.0 --port 9900                   # FastAPI 应用
 docker compose -f vector-database.yml up -d                       # Milvus 栈 + Postgres 检查点
-docker compose -f langfuse.yml up -d                              # Langfuse(可选)
+# 可选:LangSmith 追踪 —— 在 .env 配 LANGSMITH_API_KEY(云服务,无需本地容器)
 docker start prometheus                                           # Prometheus(不在 compose 里)
 
 # 冒烟测试(无 pytest,逐个跑)
@@ -61,7 +61,7 @@ curl http://localhost:9900/health   # 健康检查
 
 - **Windows 事件循环**:psycopg async 不支持 ProactorEventLoop。`app/main.py` 在事件循环创建前强制 `WindowsSelectorEventLoopPolicy`;新脚本同样要在 `asyncio.run` 之前设置
 - **懒初始化**:异步/向量/DB 资源禁止在模块 import 期创建(防事件循环污染),一律首次调用时初始化
-- **配置走环境变量**(模板 `.env.example`):`DEEPSEEK_API_KEY`(必填)、`LLM_BASE_URL`、`PROMETHEUS_BASE_URL`、`CHECKPOINTER_DSN`、`LANGFUSE_*`
+- **配置走环境变量**(模板 `.env.example`):`DEEPSEEK_API_KEY`(必填)、`LLM_BASE_URL`、`PROMETHEUS_BASE_URL`、`CHECKPOINTER_DSN`、`LANGSMITH_*`
 - **依赖硬钉**:核心库 `==` 精确锁定(langchain==1.2.10、langgraph==1.0.8、pymilvus==2.6.9 等),勿浮动
 - **源码一律 UTF-8**(`config.py` 已有 GBK mojibake 事故现场,勿再引入)
 - **测试用 `scripts/test_*.py` 冒烟脚本,不写 pytest**(项目无 pytest 依赖)
@@ -75,6 +75,6 @@ curl http://localhost:9900/health   # 健康检查
 
 ## 端口速查
 
-应用 :9900 · LLM 网关 :8006 · MCP :8003 · Milvus :19530 · Attu :8000 · Ollama :11434 · Prometheus :9090 · Postgres :5432 · Langfuse :4000
+应用 :9900 · LLM 网关 :8006 · MCP :8003 · Milvus :19530 · Attu :8000 · Ollama :11434 · Prometheus :9090 · Postgres :5432 · LangSmith(云,无本地端口)
 
 > Windows 坑:Milvus 的 9091 落在系统保留区间(9080-9179),已映射到宿主 19091(`vector-database.yml`)。`prometheus/rules.yml` 含故意触发的 FakeServiceDown 演示告警(fake-service:9999 死目标),不是故障。

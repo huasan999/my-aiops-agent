@@ -35,10 +35,9 @@ PLACEHOLDER_TOKENS = [
 # 真实部署必须替换,但出现在仓库内属约定俗成
 KNOWN_DEFAULTS = [
     "minioadmin", "miniosecret", "minio:minio", "minio123",
-    "langfuse", "clickhouse", "postgres", "postgresql",
+    "clickhouse", "postgres", "postgresql",
     "aiops:aiops", "127.0.0.1", "localhost",
     # 常见 dev 容器内服务名
-    "langfuse-db", "langfuse-redis", "langfuse-clickhouse", "langfuse-minio",
     "milvus-etcd", "milvus-minio", "milvus-standalone",
     # 通用服务默认端口
     ":5432", ":6379", ":9000", ":8123", ":9090", ":19530", ":4000",
