@@ -21,6 +21,7 @@ from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
 
 from app.services.aiops_service import aiops_service
+from app.services.diagnosis_history import diagnosis_history
 from app.services.diagnosis_manager import diagnosis_manager
 
 router = APIRouter()
@@ -37,20 +38,36 @@ class AIOpsRequest(BaseModel):
 
 
 async def _run_diagnosis(task_id: str, session_id: str):
-    """后台执行诊断,事件写入任务流"""
+    """后台执行诊断,事件写入任务流;完成后归档到诊断历史"""
     task = diagnosis_manager.get(task_id)
     if task is None:
         return
 
+    plan, steps, report = [], [], ""
     try:
         async for event in aiops_service.stream_execute(
             DIAGNOSIS_TASK,
             session_id=session_id,
         ):
             await task.publish(event)
+            if event.get("type") == "plan":
+                plan = event.get("plan", [])
+            elif event.get("type") == "step_complete":
+                steps.append(event.get("current_step", ""))
+            elif event.get("type") == "report":
+                report = event.get("report", "")
             if event.get("type") in ("complete", "error"):
                 break
         task.finish("done" if task.status == "running" else task.status)
+
+        # 有报告才归档(诊断历史走向量库,不依赖浏览器/内存)
+        if report:
+            try:
+                from datetime import datetime
+                title = "系统诊断 " + datetime.now().strftime("%m-%d %H:%M")
+                diagnosis_history.save(session_id, plan, steps, report, title)
+            except Exception as e:
+                print(f"[AIOps] 诊断历史归档失败: {e}")
     except Exception as e:
         await task.publish({"type": "error", "stage": "error", "message": f"诊断出错: {str(e)}"})
         task.finish("error")
@@ -71,6 +88,22 @@ async def aiops_submit(request: AIOpsRequest):
         "status": task.status,
         "message": "诊断任务已提交",
     }
+
+
+@router.get("/aiops/history")
+async def aiops_history(limit: int = 50):
+    """诊断历史列表(按时间倒序,不含报告正文)"""
+    items = diagnosis_history.list_recent(limit=limit)
+    return {"code": 200, "items": items}
+
+
+@router.get("/aiops/history/{session_id}")
+async def aiops_history_detail(session_id: str):
+    """诊断历史详情(完整报告 + 计划 + 步骤)"""
+    item = diagnosis_history.get(session_id)
+    if item is None:
+        raise HTTPException(status_code=404, detail="诊断记录不存在")
+    return {"code": 200, "item": item}
 
 
 @router.get("/aiops/{task_id}/events")

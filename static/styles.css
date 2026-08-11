@@ -298,6 +298,26 @@ body {
 }
 .message .bubble hr { border: none; border-top: 1px solid var(--border-light); margin: 10px 0; }
 
+/* ---------- 诊断历史(后端持久化) ---------- */
+.diag-history { padding: 0 10px; margin-top: 8px; }
+.diag-history-title {
+    font-size: 12px;
+    color: var(--text-dim);
+    padding: 4px 6px;
+}
+.diag-history-list { max-height: 220px; overflow-y: auto; }
+.diag-history-item {
+    padding: 6px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.diag-history-item:hover { background: var(--code-bg); }
+
 /* ---------- 输入区 ---------- */
 .input-area {
     display: flex;

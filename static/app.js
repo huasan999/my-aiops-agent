@@ -140,6 +140,50 @@ function addDiagHistoryMessage(m) {
     return bubble;
 }
 
+// ---------- 诊断历史(后端向量库持久化,不依赖浏览器) ----------
+async function loadDiagnosisHistory() {
+    const list = document.getElementById("diagHistoryList");
+    if (!list) return;
+    try {
+        const resp = await fetch("/api/aiops/history");
+        const data = await resp.json();
+        list.innerHTML = "";
+        (data.items || []).forEach(item => {
+            const div = document.createElement("div");
+            div.className = "diag-history-item";
+            div.textContent = "🔧 " + item.title;
+            div.title = item.ts;
+            div.onclick = () => showDiagnosisDetail(item.session_id);
+            list.appendChild(div);
+        });
+    } catch (e) {
+        list.innerHTML = "";
+        const div = document.createElement("div");
+        div.className = "diag-history-item";
+        div.textContent = "诊断历史加载失败";
+        list.appendChild(div);
+    }
+}
+
+async function showDiagnosisDetail(sessionId) {
+    newChat();   // 干净的消息区展示诊断回放
+    const bubble = addMessage("assistant", "加载诊断记录...", false);
+    try {
+        const resp = await fetch(`/api/aiops/history/${sessionId}`);
+        const data = await resp.json();
+        if (data.code !== 200) throw new Error(data.detail || "加载失败");
+        const item = data.item;
+        document.getElementById("messages").innerHTML = "";
+        addDiagHistoryMessage({
+            role: "assistant",
+            content: item.report,
+            diag: { plan: item.plan || [], steps: item.steps || [] },
+        });
+    } catch (e) {
+        bubble.textContent = "加载失败: " + e.message;
+    }
+}
+
 // ---------- 核心:读取 SSE 流 ----------
 // 浏览器 EventSource 只支持 GET,我们的接口是 POST,所以用 fetch 手动读流
 // onEvent(data): 处理每个事件;返回 true 表示结束,停止读取
@@ -282,11 +326,6 @@ async function startDiagnosis() {
     statusLine.textContent = "正在制定诊断计划...";
     panel.appendChild(statusLine);
 
-    // 收集诊断过程(用于历史会话回放)
-    let diagPlan = null;
-    let diagSteps = [];
-    let diagReport = "";
-
     try {
         // 1. 提交诊断任务:立即返回 task_id(202,后台异步执行)
         const submitResp = await fetch("/api/aiops", {
@@ -306,7 +345,6 @@ async function startDiagnosis() {
         await readSSE(response, (data) => {
             if (data.type === "plan") {
                 // 计划:渲染步骤列表
-                diagPlan = data.plan;
                 statusLine.textContent = `计划已制定,共 ${data.plan.length} 个步骤`;
                 const list = document.createElement("div");
                 list.className = "diag-plan";
@@ -319,7 +357,6 @@ async function startDiagnosis() {
                 panel.appendChild(list);
             } else if (data.type === "step_complete") {
                 // 步骤完成:追加一行
-                diagSteps.push(data.current_step);
                 const item = document.createElement("div");
                 item.className = "diag-step";
                 item.textContent = "✅ " + data.current_step;
@@ -327,7 +364,6 @@ async function startDiagnosis() {
                 statusLine.textContent = data.message;
             } else if (data.type === "report") {
                 // 最终报告:单独气泡展示(Markdown 渲染)
-                diagReport = data.report;
                 statusLine.textContent = "诊断完成";
                 addMessage("assistant", data.report, true);
             } else if (data.type === "complete") {
@@ -339,21 +375,8 @@ async function startDiagnosis() {
             return false;
         });
 
-        // 3. 保存诊断记录到会话(历史回放用)
-        if (diagReport) {
-            const sessions = loadSessions();
-            const session = sessions.find(s => s.id === currentSessionId);
-            if (session) {
-                session.messages.push({ role: "user", content: "🔧 AIOps 智能诊断" });
-                session.messages.push({
-                    role: "assistant",
-                    content: diagReport,
-                    diag: { plan: diagPlan || [], steps: diagSteps },
-                });
-                saveSessions(sessions);
-                renderSessionList();
-            }
-        }
+        // 3. 刷新诊断历史(报告已由后端归档到向量库,前端不落 localStorage)
+        loadDiagnosisHistory();
 
         document.getElementById("messages").scrollTop =
             document.getElementById("messages").scrollHeight;
@@ -477,3 +500,4 @@ document.getElementById("input").addEventListener("input", (e) => {
 // ---------- 启动 ----------
 applyTheme();   // 恢复上次选择的主题
 newChat();
+loadDiagnosisHistory();   // 从后端加载诊断历史(向量库)

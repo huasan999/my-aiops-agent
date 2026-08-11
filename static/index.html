@@ -11,7 +11,13 @@
     <!-- 左侧边栏 -->
     <aside class="sidebar">
         <button class="new-chat-btn" onclick="newChat()">＋ 新建对话</button>
-        <div class="session-list" id="sessionList"></div>        <!-- 文档上传 -->
+        <div class="session-list" id="sessionList"></div>
+        <!-- 诊断历史(后端向量库持久化) -->
+        <div class="diag-history">
+            <div class="diag-history-title">🔧 诊断历史</div>
+            <div class="diag-history-list" id="diagHistoryList"></div>
+        </div>
+        <!-- 文档上传 -->
         <div class="upload-area">
             <input type="file" id="fileInput" accept=".txt,.md,.pdf,.docx,.png,.jpg,.jpeg,.bmp,.webp" hidden>
             <button class="upload-btn" id="uploadBtn">📤 上传文档到知识库</button>
