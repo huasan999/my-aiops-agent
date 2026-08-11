@@ -93,9 +93,51 @@ function switchSession(id) {
     const sessions = loadSessions();
     const session = sessions.find(s => s.id === id);
     if (session) {
-        session.messages.forEach(m => addMessage(m.role, m.content, m.role === "assistant"));
+        session.messages.forEach(m => {
+            if (m.diag) addDiagHistoryMessage(m);
+            else addMessage(m.role, m.content, m.role === "assistant");
+        });
     }
     renderSessionList();
+}
+
+// ---------- 历史诊断回放 ----------
+// 渲染保存过的诊断:计划 → 执行步骤 → 报告(Markdown)
+function addDiagHistoryMessage(m) {
+    const bubble = addMessage(m.role, "", false);
+
+    const title = document.createElement("div");
+    title.className = "diag-title";
+    title.textContent = "🔧 AIOps 智能诊断";
+    bubble.appendChild(title);
+
+    if (m.diag.plan && m.diag.plan.length) {
+        const list = document.createElement("div");
+        list.className = "diag-plan";
+        m.diag.plan.forEach((step, i) => {
+            const item = document.createElement("div");
+            item.className = "diag-plan-item";
+            item.textContent = (i + 1) + ". " + step;
+            list.appendChild(item);
+        });
+        bubble.appendChild(list);
+    }
+
+    if (m.diag.steps && m.diag.steps.length) {
+        m.diag.steps.forEach(s => {
+            const item = document.createElement("div");
+            item.className = "diag-step";
+            item.textContent = "✅ " + s;
+            bubble.appendChild(item);
+        });
+    }
+
+    if (m.content) {
+        const report = document.createElement("div");
+        report.innerHTML = renderMarkdown(m.content);
+        bubble.appendChild(report);
+    }
+    return bubble;
 }
 
 // ---------- 核心:读取 SSE 流 ----------
@@ -240,6 +282,11 @@ async function startDiagnosis() {
     statusLine.textContent = "正在制定诊断计划...";
     panel.appendChild(statusLine);
 
+    // 收集诊断过程(用于历史会话回放)
+    let diagPlan = null;
+    let diagSteps = [];
+    let diagReport = "";
+
     try {
         // 1. 提交诊断任务:立即返回 task_id(202,后台异步执行)
         const submitResp = await fetch("/api/aiops", {
@@ -259,6 +306,7 @@ async function startDiagnosis() {
         await readSSE(response, (data) => {
             if (data.type === "plan") {
                 // 计划:渲染步骤列表
+                diagPlan = data.plan;
                 statusLine.textContent = `计划已制定,共 ${data.plan.length} 个步骤`;
                 const list = document.createElement("div");
                 list.className = "diag-plan";
@@ -271,6 +319,7 @@ async function startDiagnosis() {
                 panel.appendChild(list);
             } else if (data.type === "step_complete") {
                 // 步骤完成:追加一行
+                diagSteps.push(data.current_step);
                 const item = document.createElement("div");
                 item.className = "diag-step";
                 item.textContent = "✅ " + data.current_step;
@@ -278,6 +327,7 @@ async function startDiagnosis() {
                 statusLine.textContent = data.message;
             } else if (data.type === "report") {
                 // 最终报告:单独气泡展示(Markdown 渲染)
+                diagReport = data.report;
                 statusLine.textContent = "诊断完成";
                 addMessage("assistant", data.report, true);
             } else if (data.type === "complete") {
@@ -288,6 +338,22 @@ async function startDiagnosis() {
             }
             return false;
         });
+
+        // 3. 保存诊断记录到会话(历史回放用)
+        if (diagReport) {
+            const sessions = loadSessions();
+            const session = sessions.find(s => s.id === currentSessionId);
+            if (session) {
+                session.messages.push({ role: "user", content: "🔧 AIOps 智能诊断" });
+                session.messages.push({
+                    role: "assistant",
+                    content: diagReport,
+                    diag: { plan: diagPlan || [], steps: diagSteps },
+                });
+                saveSessions(sessions);
+                renderSessionList();
+            }
+        }
 
         document.getElementById("messages").scrollTop =
             document.getElementById("messages").scrollHeight;
