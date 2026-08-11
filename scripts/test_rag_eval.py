@@ -36,6 +36,26 @@ _shim_llms = types.ModuleType("langchain_community.llms.vertexai")
 _shim_llms.VertexAI = _Dummy
 sys.modules.setdefault("langchain_community.llms.vertexai", _shim_llms)
 
+# langchain 1.x 拆包后 langchain.smith / langchain.chains / langchain.schema
+# 移入 langchain-classic,ragas 仍按旧路径 import,逐个 shim
+import importlib
+
+for _pkg, _subs in [
+    ("langchain_classic.smith", ["", "evaluation", "evaluation.config", "evaluation.runner_utils"]),
+    ("langchain_classic.chains", ["", "base"]),
+    ("langchain_classic.schema", [""]),
+    ("langchain_classic.callbacks", ["", "manager"]),
+]:
+    _pkg_last = _pkg.split(".")[-1]
+    for _sub in _subs:
+        try:
+            _mod_name = f"{_pkg}.{_sub}" if _sub else _pkg
+            _alias = f"langchain.{_pkg_last}.{_sub}" if _sub else f"langchain.{_pkg_last}"
+            _m = importlib.import_module(_mod_name)
+            sys.modules.setdefault(_alias, _m)
+        except ImportError:
+            pass
+
 from dotenv import load_dotenv
 
 load_dotenv(ROOT / ".env")
@@ -97,8 +117,9 @@ def answer(question: str, contexts: list) -> str:
     }).content
 
 
-def main():
-    print(f"=== RAG 评测: {len(QUESTIONS)} 个问题 ===")
+def run_local_eval():
+    """本地 RAGAS 评测(不上传任何数据)"""
+    print(f"=== RAG 评测(本地): {len(QUESTIONS)} 个问题 ===")
     samples = []
     for q in QUESTIONS:
         print(f"\n[1/3 检索] {q[:24]}...")
@@ -135,6 +156,90 @@ def main():
         for key in scores[0]:
             avg = sum(s[key] for s in scores) / n
             print(f"  {key}: {avg:.3f}")
+
+
+def run_langsmith_eval():
+    """LangSmith 可视化评测:数据集上传云端,评测结果在 Experiments 页面展示
+
+    看结果: https://smith.langchain.com → Datasets & Experiments → rag-eval-questions
+    每跑一次生成一个 experiment,可对比不同版本的分数与 trace。
+    """
+    import pandas as pd
+    import uuid
+    import langsmith.client as _ls_client
+    from langsmith import Client
+    from langsmith.utils import LangSmithNotFoundError
+
+    # langsmith 0.10 + langchain_classic 兼容 bug:source_info["__run"] 为 RunInfo
+    # 对象时 create_feedback 内部无法下标访问,先规范化为 dict
+    _orig_feedback = _ls_client.Client.create_feedback
+
+    def _fixed_create_feedback(self, *args, **kwargs):
+        # bug1: source_run_id 为 RunInfo 对象时 str() 产生非法 UUID
+        src = kwargs.get("source_run_id")
+        if src is not None and not isinstance(src, (str, uuid.UUID)):
+            kwargs["source_run_id"] = str(getattr(src, "id", src))
+        # bug2: source_info["__run"] 是 RunInfo 对象(属性为 run_id,不可下标)
+        si = kwargs.get("source_info")
+        if isinstance(si, dict) and "__run" in si and not isinstance(si["__run"], dict):
+            si["__run"] = {"run_id": str(getattr(si["__run"], "run_id", si["__run"]))}
+        return _orig_feedback(self, *args, **kwargs)
+
+    _ls_client.Client.create_feedback = _fixed_create_feedback
+
+    DATASET_NAME = "rag-eval-questions"
+    client = Client()
+
+    # 1. 上传/重建评测数据集(5 个问题)
+    try:
+        client.read_dataset(dataset_name=DATASET_NAME)
+        client.delete_dataset(dataset_name=DATASET_NAME)   # 已存在则重建(保持最新)
+        print(f"[1/3] 重建数据集 {DATASET_NAME}...")
+    except LangSmithNotFoundError:
+        print(f"[1/3] 创建数据集 {DATASET_NAME}...")
+    df = pd.DataFrame([{"question": q, "ground_truth": ""} for q in QUESTIONS])
+    client.upload_dataframe(
+        df,
+        name=DATASET_NAME,
+        input_keys=["question"],
+        output_keys=["ground_truth"],
+        description="AIOps 故障排查 RAG 评测问题集",
+    )
+
+    # 2. RAG 生成工厂:问题 → 检索知识库 → DeepSeek 回答(每次调用自动记 trace)
+    # ragas EvaluatorChain 要求输出含 answer 和 contexts 两个键
+    def rag_chain_factory(inputs: dict) -> dict:
+        q = inputs["question"]
+        contexts = retrieve(q)
+        return {"answer": answer(q, contexts), "contexts": contexts}
+
+    print("[2/3] 在 LangSmith 上跑评测(生成回答 + RAGAS 打分)...")
+    # 3. ragas 指标包装成 evaluator(显式传 LLM/embedding,走本地网关,不依赖 OPENAI_API_KEY)
+    from langchain.smith import RunEvalConfig
+    from langchain_classic.smith.evaluation.runner_utils import run_on_dataset
+    from ragas.integrations.langchain import EvaluatorChain
+
+    evaluators = [
+        EvaluatorChain(Faithfulness(), llm=LLM),
+        EvaluatorChain(AnswerRelevancy(), llm=LLM, embeddings=EMBEDDINGS),
+        EvaluatorChain(_LLMContextPrecisionWithoutReference(), llm=LLM),
+    ]
+    run_on_dataset(
+        client=client,
+        dataset_name=DATASET_NAME,
+        llm_or_chain_factory=rag_chain_factory,
+        evaluation=RunEvalConfig(custom_evaluators=evaluators),
+        project_name="rag-eval",
+        verbose=False,
+    )
+    print("[3/3] 完成!去 https://smith.langchain.com → Datasets & Experiments → rag-eval-questions 查看")
+
+
+def main():
+    if "--langsmith" in sys.argv:
+        run_langsmith_eval()
+    else:
+        run_local_eval()
 
 
 if __name__ == "__main__":
