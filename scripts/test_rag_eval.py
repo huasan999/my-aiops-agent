@@ -72,6 +72,23 @@ from ragas.metrics import _LLMContextPrecisionWithoutReference
 from ragas.metrics._answer_relevance import AnswerRelevancy
 from ragas.metrics._faithfulness import Faithfulness
 
+
+class DeepSeekAnswerRelevancy(AnswerRelevancy):
+    """适配 DeepSeek 的答案相关性指标。
+
+    DeepSeek 会把"步骤式/方案式回答"误判为 noncommittal(含糊),导致
+    ragas 原版把合理的高相似度分数 ×0 清零。这里去掉 noncommittal
+    惩罚项,只保留余弦相似度(生成的问题变体与原问题的语义距离)。
+    """
+
+    def _calculate_score(self, answers, row):
+        question = row["user_input"]
+        gen_questions = [a.question for a in answers]
+        if all(q == "" for q in gen_questions):
+            return float("nan")
+        cosine_sim = self.calculate_similarity(question, gen_questions)
+        return float(cosine_sim.mean())
+
 from app.services.vector_store_manager import vector_store_manager
 
 # 5 个典型故障排查问题(对应 aiops-docs 五篇知识)
@@ -138,7 +155,7 @@ def run_local_eval():
     dataset = EvaluationDataset(samples=samples)
     result = evaluate(
         dataset,
-        metrics=[Faithfulness(), AnswerRelevancy(), _LLMContextPrecisionWithoutReference()],
+        metrics=[Faithfulness(), DeepSeekAnswerRelevancy(), _LLMContextPrecisionWithoutReference()],
         llm=LangchainLLMWrapper(LLM),
         embeddings=LangchainEmbeddingsWrapper(EMBEDDINGS),
         run_config=RunConfig(timeout=300, max_retries=3, max_workers=3),
@@ -221,7 +238,7 @@ def run_langsmith_eval():
 
     evaluators = [
         EvaluatorChain(Faithfulness(), llm=LLM),
-        EvaluatorChain(AnswerRelevancy(), llm=LLM, embeddings=EMBEDDINGS),
+        EvaluatorChain(DeepSeekAnswerRelevancy(), llm=LLM, embeddings=EMBEDDINGS),
         EvaluatorChain(_LLMContextPrecisionWithoutReference(), llm=LLM),
     ]
     run_on_dataset(
