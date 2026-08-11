@@ -9,7 +9,6 @@ from app.agent.aiops.executor import executor
 from app.agent.aiops.planner import planner
 from app.agent.aiops.replanner import replanner
 from app.agent.aiops.state import PlanExecuteState
-from app.core.tracing import get_callbacks
 
 # 硬性保险丝:图级 recursion_limit(节点执行总次数上限,兜底防死循环)
 # 正常情况下 4-6 步 + replanner 6 步保险丝,这里留足余量但设硬上限
@@ -119,7 +118,6 @@ class AIOpsService:
             {
                 "configurable": {"thread_id": session_id},
                 "recursion_limit": RECURSION_LIMIT,
-                "callbacks": get_callbacks(),
             },
         )
         return result.get("response", "")
@@ -160,7 +158,6 @@ class AIOpsService:
         config = {
             "configurable": {"thread_id": session_id},
             "recursion_limit": RECURSION_LIMIT,
-            "callbacks": get_callbacks(),
         }
 
         try:

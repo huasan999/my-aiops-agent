@@ -10,7 +10,6 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import MemorySaver
 
-from app.core.tracing import get_callbacks
 from app.services.memory_store import memory_store
 from app.tools.knowledge_tool import retrieve_knowledge
 from app.tools.query_metrics_alerts import query_prometheus_alerts
@@ -123,7 +122,7 @@ async def stream_chat(question: str, session_id: str = "default", image_url: str
         enriched = f"{question}\n\n[图片内容参考]: {description}"
         result = await _get_agent().ainvoke(
             {"messages": _build_messages(enriched, None, memory_context)},
-            {"configurable": {"thread_id": session_id}, "callbacks": get_callbacks()},
+            {"configurable": {"thread_id": session_id}},
         )
         answer = result["messages"][-1].content
         yield answer
@@ -131,10 +130,9 @@ async def stream_chat(question: str, session_id: str = "default", image_url: str
         return
 
     full_answer = ""
-    _cb = get_callbacks()
     async for event in _get_agent().astream(
         {"messages": _build_messages(question, None, memory_context)},
-        {"configurable": {"thread_id": session_id}, "callbacks": _cb},
+        {"configurable": {"thread_id": session_id}},
         stream_mode="messages",
     ):
         token, metadata = event

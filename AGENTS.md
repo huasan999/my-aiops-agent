@@ -34,7 +34,7 @@ my-aiops-agent/
 | 状态机节点 | `app/agent/aiops/` | planner→executor→replanner 循环 |
 | HTTP 接口 | `app/api/` | POST /api/aiops + GET /api/aiops/{id}/events |
 | LLM 调用 | `app/core/llm_client.py` | 统一经网关 :8006 |
-| 可观测性 | `app/core/tracing.py` | LangSmith 自动追踪(环境变量) |
+| 可观测性 | LangSmith | 环境变量自动追踪,无代码接入 |
 | 向量检索/索引 | `app/services/vector_*` | Milvus,懒初始化 |
 | 文档入库 | `scripts/index_docs.py` | aiops-docs → Milvus |
 | 告警查询 | `app/tools/query_metrics_alerts.py` | Prometheus |
